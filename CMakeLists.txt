@@ -207,6 +207,13 @@ set(GOST_PROV_SOURCE_FILES
         gost_prov_cipher.c
         gost_prov_digest.c
         gost_prov_mac.c
+        gostprov_sig.c
+        gostprov_encode_key2any.c
+        gostprov_endecoder_common.c
+        gostprov_decode_der2key.c
+        gostprov_keys.c
+        gostprov_kmgmt.c
+        gostprov_bio.c
         )
 
 set(TEST_ENVIRONMENT_COMMON

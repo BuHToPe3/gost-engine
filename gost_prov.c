@@ -12,6 +12,66 @@
 #include "gost_prov.h"
 #include "gost_lcl.h"
 #include "prov/err.h"           /* libprov err functions */
+#include "gostprov_names.h"
+
+#define GOST_ALGC(NAMES, FUNC, CHECK) { { NAMES, "provider=gostprov", FUNC }, CHECK }
+#define GOST_ALG(NAMES, FUNC) ALGC(NAMES, FUNC, NULL)
+
+/* Functions provided by the core */
+static OSSL_FUNC_core_gettable_params_fn *c_gettable_params = NULL;
+static OSSL_FUNC_core_get_params_fn *c_get_params = NULL;
+
+/* 
+ * List of all algorithms with given OIDs
+ */
+#define GOSTPROV_OID_CNT 46
+const char* gostprov_oid_alg_list[GOSTPROV_OID_CNT] =
+{
+	"1.2.643.7.1.1.1.1", "gost2012_256",
+};
+
+/* Parameters we provide to the core */
+static const OSSL_PARAM gostprov_param_types[] = {
+    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_NAME, OSSL_PARAM_UTF8_PTR, NULL, 0),
+    //OSSL_PARAM_DEFN(OSSL_PROV_PARAM_VERSION, OSSL_PARAM_UTF8_PTR, NULL, 0),
+    //OSSL_PARAM_DEFN(OSSL_PROV_PARAM_BUILDINFO, OSSL_PARAM_UTF8_PTR, NULL, 0),
+    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_STATUS, OSSL_PARAM_INTEGER, NULL, 0),
+    OSSL_PARAM_END
+};
+
+//static const OSSL_ALGORITHM gostprov_keyexch[] = {
+//    { GOSTPROV_NAMES_GOST2012_256, "provider=gostprov", gostprov_gost2012_256_keyexch_functions },
+//    { NULL, NULL, NULL }
+//};
+
+static const OSSL_ALGORITHM gostprov_signature[] = {
+    { GOSTPROV_NAMES_GOST2012_256, "provider=gostprov", gostprov_signature_functions },
+    { NULL, NULL, NULL }
+};
+
+//static const OSSL_ALGORITHM gostprov_asym_kem[] = {
+//    { GOSTPROV_NAMES_GOST2012_256, "provider=gostprov", gostprov_gost2012_256_asym_kem_functions },
+//    { NULL, NULL, NULL }
+//};
+
+static const OSSL_ALGORITHM gostprov_encoder[] = {
+#define ENCODER_PROVIDER "gostprov"
+#include "gostprov_encoders.inc"
+    { NULL, NULL, NULL }
+#undef ENCODER_PROVIDER
+};
+
+static const OSSL_ALGORITHM gostprov_decoder[] = {
+#define DECODER_PROVIDER "gostprov"
+#include "gostprov_decoders.inc"
+    { NULL, NULL, NULL }
+#undef DECODER_PROVIDER
+};
+
+static const OSSL_PARAM *gostprov_gettable_params(void *provctx)
+{
+    return gostprov_param_types;
+}
 
 /*********************************************************************
  *
@@ -61,6 +121,7 @@ static PROV_CTX *provider_ctx_new(const OSSL_CORE_HANDLE *core,
     if ((ctx = OPENSSL_zalloc(sizeof(*ctx))) != NULL
         && (ctx->proverr_handle = proverr_new_handle(core, in)) != NULL
         && (ctx->libctx = OSSL_LIB_CTX_new()) != NULL
+		&& (ctx->corebiometh = gostprov_bio_prov_init_bio_method()) != NULL
         && (ctx->e = ENGINE_new()) != NULL
         && populate_gost_engine(ctx->e)) {
         ctx->core_handle = core;
@@ -94,6 +155,17 @@ static const OSSL_ALGORITHM *gost_operation(void *vprovctx,
         return GOST_prov_digests;
     case OSSL_OP_MAC:
         return GOST_prov_macs;
+		
+	case OSSL_OP_SIGNATURE: //TODO - not implemented
+        return gostprov_signature;
+	//case OSSL_OP_KEM: //TODO - not implemented
+    //   return gostprov_asym_kem;
+    //case OSSL_OP_KEYMGMT: //TODO - not implemented
+    //    return gostprov_keymgmt;
+    case OSSL_OP_ENCODER: //TODO - not implemented
+        return gostprov_encoder;
+    case OSSL_OP_DECODER: //TODO - not implemented
+        return gostprov_decoder;
     }
     return NULL;
 }
@@ -134,6 +206,7 @@ static const OSSL_DISPATCH provider_functions[] = {
     { OSSL_FUNC_PROVIDER_QUERY_OPERATION, (fptr_t)gost_operation },
     { OSSL_FUNC_PROVIDER_GET_REASON_STRINGS, (fptr_t)gost_get_reason_strings },
     { OSSL_FUNC_PROVIDER_GET_PARAMS, (fptr_t)gost_get_params },
+	{ OSSL_FUNC_PROVIDER_GETTABLE_PARAMS, (fptr_t)gostprov_gettable_params },
     { OSSL_FUNC_PROVIDER_TEARDOWN, (fptr_t)gost_teardown },
     { 0, NULL }
 };
@@ -162,5 +235,30 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *core,
     if ((*vprovctx = provider_ctx_new(core, in)) == NULL)
         return 0;
     *out = provider_functions;
+	
+	for (; in->function_id != 0; in++) {
+        switch (in->function_id) {
+        case OSSL_FUNC_CORE_GETTABLE_PARAMS:
+            c_gettable_params = OSSL_FUNC_core_gettable_params(in);
+            break;
+        case OSSL_FUNC_CORE_GET_PARAMS:
+            c_get_params = OSSL_FUNC_core_get_params(in);
+            break;
+        //case OSSL_FUNC_CORE_OBJ_CREATE:
+        //    c_obj_create = OSSL_FUNC_core_obj_create(in);
+        //   break;
+        //case OSSL_FUNC_CORE_OBJ_ADD_SIGID:
+        //    c_obj_add_sigid = OSSL_FUNC_core_obj_add_sigid(in);
+        //    break;
+		//case OSSL_FUNC_CORE_GET_LIBCTX:
+        //    c_get_libctx = OSSL_FUNC_core_get_libctx(in);
+        //    break;
+        /* Just ignore anything we don't understand */
+        default:
+            break;
+        }
+    }
+	
+	
     return 1;
 }
