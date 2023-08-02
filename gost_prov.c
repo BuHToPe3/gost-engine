@@ -15,7 +15,7 @@
 #include "gostprov_names.h"
 
 #define GOST_ALGC(NAMES, FUNC, CHECK) { { NAMES, "provider=gostprov", FUNC }, CHECK }
-#define GOST_ALG(NAMES, FUNC) ALGC(NAMES, FUNC, NULL)
+#define GOST_ALG(NAMES, FUNC) GOST_ALGC(NAMES, FUNC, NULL)
 
 /* Functions provided by the core */
 static OSSL_FUNC_core_gettable_params_fn *c_gettable_params = NULL;
@@ -46,6 +46,11 @@ static const OSSL_PARAM gostprov_param_types[] = {
 
 static const OSSL_ALGORITHM gostprov_signature[] = {
     { GOSTPROV_NAMES_GOST2012_256, "provider=gostprov", gostprov_signature_functions },
+    { NULL, NULL, NULL }
+};
+
+static const OSSL_ALGORITHM gostprov_keymgmt[] = {
+	{ GOSTPROV_NAMES_GOST2012_256, "provider=gostprov", gostprov_gost2012_256_keymgmt_functions },
     { NULL, NULL, NULL }
 };
 
@@ -160,8 +165,8 @@ static const OSSL_ALGORITHM *gost_operation(void *vprovctx,
         return gostprov_signature;
 	//case OSSL_OP_KEM: //TODO - not implemented
     //   return gostprov_asym_kem;
-    //case OSSL_OP_KEYMGMT: //TODO - not implemented
-    //    return gostprov_keymgmt;
+    case OSSL_OP_KEYMGMT: //TODO - not implemented
+        return gostprov_keymgmt;
     case OSSL_OP_ENCODER: //TODO - not implemented
         return gostprov_encoder;
     case OSSL_OP_DECODER: //TODO - not implemented
