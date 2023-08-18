@@ -124,10 +124,22 @@ struct der2key_ctx_st {
     unsigned int flag_fatal : 1;
 };
 
-int gostprov_read_der(PROV_CTX *provctx, OSSL_CORE_BIO *cin,  unsigned char **data,
-                  long *len) {
-	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
-    return -1;
+int gostprov_read_der(PROV_CTX *provctx, OSSL_CORE_BIO *cin,
+			unsigned char **data, long *len) 
+{
+    GOSTPROV_PRINTF("GOSTPROV provider: gostprov_read_der called.\n");
+
+    BUF_MEM *mem = NULL;
+    BIO *in = gostprov_bio_new_from_core_bio(provctx, cin);
+    int ok = (asn1_d2i_read_bio(in, &mem) >= 0);
+
+    if (ok) {
+        *data = (unsigned char *)mem->data;
+        *len = (long)mem->length;
+        OPENSSL_free(mem);
+    }
+    BIO_free(in);
+    return ok;
 }
 
 typedef void *key_from_pkcs8_t(const PKCS8_PRIV_KEY_INFO *p8inf,
@@ -136,8 +148,17 @@ static void *gostprov_der2key_decode_p8(const unsigned char **input_der,
                                long input_der_len, struct der2key_ctx_st *ctx,
                                key_from_pkcs8_t *key_from_pkcs8)
 {
-	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
-    return NULL;
+	PKCS8_PRIV_KEY_INFO *p8inf = NULL;
+    const X509_ALGOR *alg = NULL;
+    void *key = NULL;
+
+    if ((p8inf = d2i_PKCS8_PRIV_KEY_INFO(NULL, input_der, input_der_len)) != NULL
+        && PKCS8_pkey_get0(NULL, NULL, NULL, &alg, p8inf)
+        && OBJ_obj2nid(alg->algorithm) == ctx->desc->evp_type)
+        key = key_from_pkcs8(p8inf, GOSTPROV_LIBCTX_OF(ctx->provctx), NULL);
+    PKCS8_PRIV_KEY_INFO_free(p8inf);
+
+    return key;
 }
 
 GOSTPROV_KEY *gostprov_d2i_PUBKEY(GOSTPROV_KEY **a,
@@ -182,23 +203,163 @@ static void der2key_freectx(void *vctx)
 static int der2key_check_selection(int selection,
                                    const struct keytype_desc_st *desc)
 {
-	GOSTPROV_PRINTF("GOSTPROV provider: decoder der2key_check_selection\n");
-	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
-    return -1;
+	 /*
+     * The selections are kinda sorta "levels", i.e. each selection given
+     * here is assumed to include those following.
+     */
+    int checks[] = {
+        OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+        OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
+        OSSL_KEYMGMT_SELECT_ALL_PARAMETERS
+    };
+    size_t i;
+
+    /* The decoder implementations made here support guessing */
+    if (selection == 0)
+        return 1;
+
+    for (i = 0; i < OSSL_NELEM(checks); i++) {
+        int check1 = (selection & checks[i]) != 0;
+        int check2 = (desc->selection_mask & checks[i]) != 0;
+
+        /*
+         * If the caller asked for the currently checked bit(s), return
+         * whether the decoder description says it's supported.
+         */
+        if (check1)
+            return check2;
+    }
+
+    /* This should be dead code, but just to be safe... */
+    return 0;
 }
 
 static int gostprov_der2key_decode(void *vctx, OSSL_CORE_BIO *cin, int selection,
                           OSSL_CALLBACK *data_cb, void *data_cbarg,
                           OSSL_PASSPHRASE_CALLBACK *pw_cb, void *pw_cbarg)
 {
-	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
-    return -1;
+	GOSTPROV_PRINTF("GOSTPROV provider: gostprov_der2key_decode called\n"); 
+struct der2key_ctx_st *ctx = vctx;
+    unsigned char *der = NULL;
+    const unsigned char *derp;
+    long der_len = 0;
+    void *key = NULL;
+    int ok = 0;
+
+    ctx->selection = selection;
+    /*
+     * The caller is allowed to specify 0 as a selection mark, to have the
+     * structure and key type guessed.  For type-specific structures, this
+     * is not recommended, as some structures are very similar.
+     * Note that 0 isn't the same as OSSL_KEYMGMT_SELECT_ALL, as the latter
+     * signifies a private key structure, where everything else is assumed
+     * to be present as well.
+     */
+    if (selection == 0)
+        selection = ctx->desc->selection_mask;
+    if ((selection & ctx->desc->selection_mask) == 0) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
+
+    ok = gostprov_read_der(ctx->provctx, cin, &der, &der_len);
+    if (!ok)
+        goto next;
+
+    ok = 0;                      /* Assume that we fail */
+
+    if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) != 0) {
+        derp = der;
+        if (ctx->desc->d2i_PKCS8 != NULL) {
+            key = ctx->desc->d2i_PKCS8(NULL, &derp, der_len, ctx);
+            if (ctx->flag_fatal)
+                goto end;
+        } else if (ctx->desc->d2i_private_key != NULL) {
+            key = ctx->desc->d2i_private_key(NULL, &derp, der_len);
+        }
+        if (key == NULL && ctx->selection != 0)
+            goto next;
+    }
+    if (key == NULL && (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) != 0) {
+        derp = der;
+        if (ctx->desc->d2i_PUBKEY != NULL)
+            key = ctx->desc->d2i_PUBKEY(NULL, &derp, der_len);
+        else
+            key = ctx->desc->d2i_public_key(NULL, &derp, der_len);
+        if (key == NULL && ctx->selection != 0)
+            goto next;
+    }
+    if (key == NULL && (selection & OSSL_KEYMGMT_SELECT_ALL_PARAMETERS) != 0) {
+        derp = der;
+        if (ctx->desc->d2i_key_params != NULL)
+            key = ctx->desc->d2i_key_params(NULL, &derp, der_len);
+        if (key == NULL && ctx->selection != 0)
+            goto next;
+    }
+
+    /*
+     * Last minute check to see if this was the correct type of key.  This
+     * should never lead to a fatal error, i.e. the decoding itself was
+     * correct, it was just an unexpected key type.  This is generally for
+     * classes of key types that have subtle variants, like RSA-PSS keys as
+     * opposed to plain RSA keys.
+     */
+    if (key != NULL
+        && ctx->desc->check_key != NULL
+        && !ctx->desc->check_key(key, ctx)) {
+        ctx->desc->free_key(key);
+        key = NULL;
+    }
+
+    if (key != NULL && ctx->desc->adjust_key != NULL)
+        ctx->desc->adjust_key(key, ctx);
+
+ next:
+    /*
+     * Indicated that we successfully decoded something, or not at all.
+     * Ending up "empty handed" is not an error.
+     */
+    ok = 1;
+
+    /*
+     * We free memory here so it's not held up during the callback, because
+     * we know the process is recursive and the allocated chunks of memory
+     * add up.
+     */
+    OPENSSL_free(der);
+    der = NULL;
+
+    if (key != NULL) {
+        OSSL_PARAM params[4];
+        int object_type = OSSL_OBJECT_PKEY;
+
+        params[0] =
+            OSSL_PARAM_construct_int(OSSL_OBJECT_PARAM_TYPE, &object_type);
+        params[1] =
+            OSSL_PARAM_construct_utf8_string(OSSL_OBJECT_PARAM_DATA_TYPE,
+                                             (char *)ctx->desc->keytype_name,
+                                             0);
+        /* The address of the key becomes the octet string */
+        params[2] =
+            OSSL_PARAM_construct_octet_string(OSSL_OBJECT_PARAM_REFERENCE,
+                                              &key, sizeof(key));
+        params[3] = OSSL_PARAM_construct_end();
+
+        ok = data_cb(params, data_cbarg);
+    }
+
+ end:
+    ctx->desc->free_key(key);
+    OPENSSL_free(der);
+
+    return ok;
 }
 
 static int der2key_export_object(void *vctx,
                                  const void *reference, size_t reference_sz,
                                  OSSL_CALLBACK *export_cb, void *export_cbarg)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: der2key_export_object called\n"); 
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -208,11 +369,13 @@ static int der2key_export_object(void *vctx,
 static void *gostprov_d2i_PKCS8(void **key, const unsigned char **der, long der_len,
                            struct der2key_ctx_st *ctx)
 {
-    GOSTPROV_PRINTF("GOSTPROV provider: gostprov_d2i_PKCS8 called.\n");
-	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
-	return NULL;
-    //return gostprov_der2key_decode_p8(der, der_len, ctx,
-    //                         (key_from_pkcs8_t *)gostprov_key_from_pkcs8);
+	GOSTPROV_PRINTF("GOSTPROV provider: gostprov_d2i_PKCS8 called\n"); 
+	
+    //GOSTPROV_PRINTF("GOSTPROV provider: gostprov_d2i_PKCS8 called.\n");
+	//ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
+	//return NULL;
+    return gostprov_der2key_decode_p8(der, der_len, ctx,
+                             (key_from_pkcs8_t *)gostprov_key_from_pkcs8);
 }
 
 static void gostprov_key_adjust(void *key, struct der2key_ctx_st *ctx)
@@ -385,3 +548,6 @@ static void gostprov_key_adjust(void *key, struct der2key_ctx_st *ctx)
 
 MAKE_DECODER("gost2012_256", gost2012_256, gostprov, PrivateKeyInfo);
 MAKE_DECODER("gost2012_256", gost2012_256, gostprov, SubjectPublicKeyInfo);
+
+MAKE_DECODER("id-tc26-signwithdigest-gost3410-2012-256", hash_with_sign12_256, gostprov, PrivateKeyInfo);
+MAKE_DECODER("id-tc26-signwithdigest-gost3410-2012-256", hash_with_sign12_256, gostprov, SubjectPublicKeyInfo);

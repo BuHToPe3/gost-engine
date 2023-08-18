@@ -24,10 +24,11 @@ static OSSL_FUNC_core_get_params_fn *c_get_params = NULL;
 /* 
  * List of all algorithms with given OIDs
  */
-#define GOSTPROV_OID_CNT 46
+#define GOSTPROV_OID_CNT 2
 const char* gostprov_oid_alg_list[GOSTPROV_OID_CNT] =
 {
 	"1.2.643.7.1.1.1.1", "gost2012_256",
+	//"1.2.643.7.1.1.3.2", "id-tc26-signwithdigest-gost3410-2012-256",
 };
 
 /* Parameters we provide to the core */
@@ -237,6 +238,15 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *core,
                        const OSSL_DISPATCH **out,
                        void **vprovctx)
 {
+	int i = 0;
+	
+	OSSL_FUNC_core_obj_create_fn *c_obj_create= NULL;
+
+    OSSL_FUNC_core_obj_add_sigid_fn *c_obj_add_sigid= NULL;
+	
+	if (!gostprov_bio_from_dispatch(in))
+        return 0;
+	
     if ((*vprovctx = provider_ctx_new(core, in)) == NULL)
         return 0;
     *out = provider_functions;
@@ -249,19 +259,41 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *core,
         case OSSL_FUNC_CORE_GET_PARAMS:
             c_get_params = OSSL_FUNC_core_get_params(in);
             break;
-        //case OSSL_FUNC_CORE_OBJ_CREATE:
-        //    c_obj_create = OSSL_FUNC_core_obj_create(in);
-        //   break;
-        //case OSSL_FUNC_CORE_OBJ_ADD_SIGID:
-        //    c_obj_add_sigid = OSSL_FUNC_core_obj_add_sigid(in);
-        //    break;
-		//case OSSL_FUNC_CORE_GET_LIBCTX:
-        //    c_get_libctx = OSSL_FUNC_core_get_libctx(in);
-        //    break;
+        case OSSL_FUNC_CORE_OBJ_CREATE:
+            c_obj_create = OSSL_FUNC_core_obj_create(in);
+           break;
+        case OSSL_FUNC_CORE_OBJ_ADD_SIGID:
+            c_obj_add_sigid = OSSL_FUNC_core_obj_add_sigid(in);
+            break;
         /* Just ignore anything we don't understand */
         default:
             break;
         }
+    }
+    
+    // we need these functions:
+    if (c_obj_create == NULL || c_obj_add_sigid == NULL)
+        return 0;
+    
+    for (i=0; i<GOSTPROV_OID_CNT;i+=2) {
+        if (!c_obj_create(core, gostprov_oid_alg_list[i], gostprov_oid_alg_list[i+1], gostprov_oid_alg_list[i+1])) {
+                //ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
+                return 0;
+        }
+
+        if (!gostprov_set_nid((char*)gostprov_oid_alg_list[i+1], OBJ_sn2nid(gostprov_oid_alg_list[i+1]))) {
+              //ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
+              return 0;
+        }
+
+        if (!c_obj_add_sigid(core, gostprov_oid_alg_list[i+1], "", gostprov_oid_alg_list[i+1])) {
+              GOSTPROV_PRINTF2("error registering %s with no hash\n", gostprov_oid_alg_list[i+1]);
+              //ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
+              return 0;
+        }
+
+        GOSTPROV_PRINTF3("GOSTPROV: successfully registered %s with NID %d\n", gostprov_oid_alg_list[i+1], OBJ_sn2nid(gostprov_oid_alg_list[i+1]));
+
     }
 	
 	

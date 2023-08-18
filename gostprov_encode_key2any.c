@@ -284,6 +284,7 @@ static int key_to_spki_der_pub_bio(BIO *out, const void *key,
                                    i2d_of_void *k2d,
                                    struct key2any_ctx_st *ctx)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: key_to_spki_der_pub_bio\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -295,6 +296,7 @@ static int key_to_spki_pem_pub_bio(BIO *out, const void *key,
                                    i2d_of_void *k2d,
                                    struct key2any_ctx_st *ctx)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: key_to_spki_pem_pub_bio\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -302,6 +304,7 @@ static int key_to_spki_pem_pub_bio(BIO *out, const void *key,
 static int prepare_gostprov_params(const void *gost_xkey, int nid, int save,
                              void **pstr, int *pstrtype)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: prepare_gostprov_params\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -309,12 +312,15 @@ static int prepare_gostprov_params(const void *gost_xkey, int nid, int save,
 
 static int gostprov_spki_pub_to_der(const void *vxkey, unsigned char **pder)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: gostprov_spki_pub_to_der called\n");
+
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
 
 static int gostprov_pki_priv_to_der(const void *vxkey, unsigned char **pder)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: gostprov_pki_priv_to_der\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -422,6 +428,7 @@ static int key2any_set_ctx_params(void *vctx, const OSSL_PARAM params[])
 
 static int key2any_check_selection(int selection, int selection_mask)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: key2any_check_selection\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -433,6 +440,7 @@ static int key2any_encode(struct key2any_ctx_st *ctx, OSSL_CORE_BIO *cout,
                           key_to_paramstring_fn *key2paramstring,
                           i2d_of_void *key2der)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: key2any_encode\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -667,6 +675,7 @@ static int print_labeled_buf(BIO *out, const char *label,
 
 static int gostprov_to_text(BIO *out, const void *key, int selection)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: gostprov_to_text\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }
@@ -686,6 +695,7 @@ static int key2text_encode(void *vctx, const void *key, int selection,
                                            int selection),
                            OSSL_PASSPHRASE_CALLBACK *cb, void *cbarg)
 {
+	GOSTPROV_PRINTF("GOSTPROV provider: key2text_encode\n");
 	ERR_raise(ERR_LIB_USER, GOSTPROV_R_NOT_IMPLEMENTED);
     return -1;
 }

@@ -387,6 +387,16 @@ static void *gost2012_256_gen_init(void *provctx, int selection)
     return gostprov_gen_init(provctx, selection, "GOST2012_256", "gost2012_256", 0, 256, 0);
 }
 
+static void *hash_with_sign12_256_new_key(void *provctx)
+{
+    return gostprov_key_new(GOSTPROV_LIBCTX_OF(provctx), "GOST2012_256", "hash_with_sign12_256", KEY_TYPE_SIG, NULL, 256, 0);
+}
+
+static void *hash_with_sign12_256_gen_init(void *provctx, int selection)
+{
+    return gostprov_gen_init(provctx, selection, "GOST2012_256", "hash_with_sign12_256", 0, 256, 0);
+}
+
 
 #define MAKE_SIG_KEYMGMT_FUNCTIONS(alg) \
 \
@@ -514,3 +524,5 @@ static void *gost2012_256_gen_init(void *provctx, int selection)
     };
 
 MAKE_SIG_KEYMGMT_FUNCTIONS(gost2012_256)
+MAKE_SIG_KEYMGMT_FUNCTIONS(hash_with_sign12_256)
+

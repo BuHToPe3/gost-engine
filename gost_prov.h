@@ -14,6 +14,10 @@
 #define GOSTPROV_PRINTF2(a, b) printf(a, b)
 #define GOSTPROV_PRINTF3(a, b, c) printf(a, b, c)
 
+// internal, but useful OSSL define:
+#ifndef OSSL_NELEM
+# define OSSL_NELEM(x)    (sizeof(x)/sizeof((x)[0]))
+#endif
 /* gostprov error codes */
 #define GOSTPROV_R_NOT_IMPLEMENTED                            255
 
@@ -175,11 +179,15 @@ extern const OSSL_DISPATCH gostprov_gost2012_256_to_EncryptedPrivateKeyInfo_pem_
 extern const OSSL_DISPATCH gostprov_gost2012_256_to_SubjectPublicKeyInfo_der_encoder_functions[];
 extern const OSSL_DISPATCH gostprov_gost2012_256_to_SubjectPublicKeyInfo_pem_encoder_functions[];
 extern const OSSL_DISPATCH gostprov_gost2012_256_to_text_encoder_functions[];
+
 extern const OSSL_DISPATCH gostprov_PrivateKeyInfo_der_to_gost2012_256_decoder_functions[];
 extern const OSSL_DISPATCH gostprov_SubjectPublicKeyInfo_der_to_gost2012_256_decoder_functions[];
+extern const OSSL_DISPATCH gostprov_PrivateKeyInfo_der_to_hash_with_sign12_256_decoder_functions[];
+extern const OSSL_DISPATCH gostprov_SubjectPublicKeyInfo_der_to_hash_with_sign12_256_decoder_functions[];
 ///// ENDECODER_FUNCTIONS_END
 
 extern const OSSL_DISPATCH gostprov_gost2012_256_keymgmt_functions[];
+extern const OSSL_DISPATCH gostprov_hash_with_sign12_256_keymgmt_functions[];
 
 /* BIO function declarations */
 int gostprov_bio_from_dispatch(const OSSL_DISPATCH *fns);
@@ -200,3 +208,4 @@ int gostprov_bio_printf(OSSL_CORE_BIO *bio, const char *format, ...);
 
 BIO_METHOD *gostprov_bio_prov_init_bio_method(void);
 BIO *gostprov_bio_new_from_core_bio(PROV_CTX *provctx, OSSL_CORE_BIO *corebio);
+

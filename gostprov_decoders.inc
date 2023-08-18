@@ -40,6 +40,8 @@
 DECODER_w_structure("gost2012_256", der, PrivateKeyInfo, gost2012_256),
 DECODER_w_structure("gost2012_256", der, SubjectPublicKeyInfo, gost2012_256),
 
+//DECODER_w_structure("id-tc26-signwithdigest-gost3410-2012-256", der, PrivateKeyInfo, hash_with_sign12_256),
+//DECODER_w_structure("id-tc26-signwithdigest-gost3410-2012-256", der, SubjectPublicKeyInfo, hash_with_sign12_256),
 /*
  * A decoder that takes a SubjectPublicKeyInfo and figures out the types of key
  * that it contains. The output is the same SubjectPublicKeyInfo

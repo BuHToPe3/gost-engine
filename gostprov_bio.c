@@ -216,7 +216,7 @@ BIO_METHOD *gostprov_bio_prov_init_bio_method(void)
     return corebiometh;
 }
 
-BIO *gostbio_new_from_core_bio(PROV_CTX *provctx, OSSL_CORE_BIO *corebio)
+BIO *gostprov_bio_new_from_core_bio(PROV_CTX *provctx, OSSL_CORE_BIO *corebio)
 {
     BIO *outbio;
     BIO_METHOD *corebiometh = provctx->corebiometh;
