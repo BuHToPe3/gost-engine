@@ -36,7 +36,7 @@ int store_bignum(const BIGNUM *bn, unsigned char *buf, int len)
     return 1;
 }
 
-static int pkey_bits_gost(const EVP_PKEY *pk)
+int pkey_bits_gost(const EVP_PKEY *pk)
 {
     if (!pk)
         return -1;
@@ -147,7 +147,7 @@ static int gost_decode_nid_params(EVP_PKEY *pkey, int pkey_nid, int param_nid)
  * Parses GOST algorithm parameters from X509_ALGOR and modifies pkey setting
  * NID and parameters
  */
-static int decode_gost_algor_params(EVP_PKEY *pkey,
+int decode_gost_algor_params(EVP_PKEY *pkey,
                                     const X509_ALGOR *palg)
 {
     const ASN1_OBJECT *palg_obj = NULL;
@@ -183,7 +183,7 @@ static int decode_gost_algor_params(EVP_PKEY *pkey,
     return gost_decode_nid_params(pkey, pkey_nid, param_nid);
 }
 
-static int gost_set_priv_key(EVP_PKEY *pkey, BIGNUM *priv)
+int gost_set_priv_key(EVP_PKEY *pkey, BIGNUM *priv)
 {
     switch (EVP_PKEY_base_id(pkey)) {
     case NID_id_GostR3410_2012_512:
@@ -544,7 +544,7 @@ static void pkey_free_gost_ec(EVP_PKEY *key)
 
 /* ------------------ private key functions  -----------------------------*/
 
-static BIGNUM *unmask_priv_key(EVP_PKEY *pk,
+BIGNUM *unmask_priv_key(EVP_PKEY *pk,
                                const unsigned char *buf, int len, int num_masks)
 {
     BIGNUM *pknum_masked = NULL, *q = NULL;
@@ -585,7 +585,7 @@ static BIGNUM *unmask_priv_key(EVP_PKEY *pk,
     return pknum_masked;
 }
 
-static int priv_decode_gost(EVP_PKEY *pk,
+int priv_decode_gost(EVP_PKEY *pk,
                             const PKCS8_PRIV_KEY_INFO *p8inf)
 {
     const unsigned char *pkey_buf = NULL, *p = NULL;
